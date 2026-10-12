@@ -1,8 +1,8 @@
 import { HourlyChart, type Day } from "@/components/HourlyChart";
-import { Tile } from "@/components/Tile";
 import { Unconfigured } from "@/components/Unconfigured";
+import { Card, Empty, PageHeader, Stat } from "@/components/ui";
 import { getHourly, getStatus } from "@/lib/data";
-import { dayLabel, gigawatts, hourStart, localDay, localHour, stamp } from "@/lib/format";
+import { dayLabel, gigawatts, hourStart, localDay, localHour, modelLabel, stamp } from "@/lib/format";
 
 export const revalidate = 300;
 
@@ -23,39 +23,53 @@ export default async function ForecastPage() {
     });
   }
   const days = [...byDay.values()].slice(-15);
-  const forecastDays = days.filter((day) => day.rows.some((row) => row.forecast != null));
-  const latest = forecastDays.at(-1);
+  const latest = days.filter((day) => day.rows.some((row) => row.forecast != null)).at(-1);
+
+  const header = (
+    <PageHeader eyebrow="Live forecast" title="Day-ahead electricity demand">
+      Each morning before 10:00 Pacific this system forecasts California ISO demand for every hour of
+      the next day. A forecast is recorded once and cannot be changed afterwards.
+    </PageHeader>
+  );
   if (!latest) {
     return (
-      <div className="card">
-        <p className="empty">No forecast has been issued yet.</p>
-      </div>
+      <>
+        {header}
+        <section className="card">
+          <Empty title="No forecast yet">The first forecast will appear here once it is issued.</Empty>
+        </section>
+      </>
     );
   }
-  const peak = latest.rows.reduce((best, row) => ((row.forecast ?? 0) > (best.forecast ?? 0) ? row : best));
-  const latestRow = hourly.findLast((row) => row.forecast_mw != null);
+
+  const forecasts = latest.rows.filter((row) => row.forecast != null);
+  const peak = forecasts.reduce((best, row) => (row.forecast! > best.forecast! ? row : best));
+  const trough = forecasts.reduce((best, row) => (row.forecast! < best.forecast! ? row : best));
+  const issued = hourly.findLast((row) => row.forecast_mw != null);
 
   return (
     <>
-      <h2>Day-ahead forecast</h2>
-      <p className="lede">
-        Every morning before 10:00 Pacific this system forecasts California ISO demand for each hour
-        of the next day. A forecast is recorded once and cannot be changed afterwards.
-      </p>
-      <div className="tiles">
-        <Tile label={`Forecast peak, ${latest.label}`} value={gigawatts(peak.forecast)} note={`hour starting ${peak.hour} Pacific`} />
-        <Tile label="Issued" value={stamp(latestRow?.issued_at ?? null)} small />
-        <Tile label="Model" value={latestRow?.model_version ?? "none"} small />
-        <Tile label="Days forecast so far" value={String(status.days_forecast)} />
+      {header}
+      <div className="stats">
+        <Stat label={`Peak, ${latest.label}`} value={gigawatts(peak.forecast)} note={`hour starting ${peak.hour}`} />
+        <Stat label={`Low, ${latest.label}`} value={gigawatts(trough.forecast)} note={`hour starting ${trough.hour}`} />
+        <Stat label="Issued" value={stamp(issued?.issued_at ?? null)} text note="stamped by the database clock" />
+        <Stat
+          label="Forecast by"
+          value={modelLabel(issued?.model_version)}
+          text
+          note={<span className="mono">{issued?.model_version}</span>}
+        />
       </div>
-      <div className="card">
-        <h3>Forecast, operator forecast and actual demand by hour</h3>
+      <Card
+        title="Hourly demand"
+        subtitle="Our forecast, the operator's own day-ahead forecast and reported demand. The last two appear once the day has happened."
+      >
         <HourlyChart days={days} initialDay={latest.day} />
-      </div>
+      </Card>
       <p className="note">
         Actual demand is what the grid operator reports to the U.S. Energy Information Administration.
-        Hours whose reported value failed screening are left out. The operator forecast is the
-        operator&apos;s own published day-ahead forecast; it appears only once the day has happened.
+        Hours whose reported value failed screening are left out.
       </p>
     </>
   );

@@ -24,8 +24,8 @@ export function ChartTooltip({
       <div className="title">{title && label != null ? title(label) : label}</div>
       {rows.map((entry) => (
         <div className="row" key={entry.name}>
-          <span>
-            <span className="key" style={{ borderTop: `2px solid ${entry.color}`, display: "inline-block", width: 14, marginRight: 6, verticalAlign: "middle" }} />
+          <span className="name">
+            <span className="key" style={{ borderTopColor: entry.color }} />
             {entry.name}
           </span>
           <strong>{format(entry.value as number)}</strong>

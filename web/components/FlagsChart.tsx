@@ -20,12 +20,13 @@ export function FlagsChart({ years, series }: { years: FlagYear[]; series: FlagS
           </span>
         ))}
       </div>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={280}>
         <BarChart data={years} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--grid)" />
           <XAxis
             dataKey="year"
             tickLine={false}
+            tickMargin={8}
             axisLine={{ stroke: "var(--axis)" }}
             tick={{ fill: "var(--text-muted)", fontSize: 12 }}
           />
@@ -37,7 +38,7 @@ export function FlagsChart({ years, series }: { years: FlagYear[]; series: FlagS
             tick={{ fill: "var(--text-muted)", fontSize: 12 }}
           />
           <Tooltip
-            cursor={{ fill: "var(--grid)", opacity: 0.5 }}
+            cursor={{ fill: "var(--surface-sunken)" }}
             content={<ChartTooltip format={(value) => `${value} h`} />}
           />
           {series.map((flag, index) => (

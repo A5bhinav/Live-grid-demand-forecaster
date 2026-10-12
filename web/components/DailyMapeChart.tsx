@@ -12,34 +12,45 @@ export type DailyPoint = {
   operatorOther: number | null;
 };
 
+const SCOPES = [
+  { key: "other", label: "Outside 09:00-17:00" },
+  { key: "all", label: "All hours" },
+] as const;
+
 export function DailyMapeChart({ points }: { points: DailyPoint[] }) {
   const [scope, setScope] = useState<"other" | "all">("other");
   const keys = scope === "all" ? (["ours", "operator"] as const) : (["oursOther", "operatorOther"] as const);
+  const dots = points.length < 20;
+  const lines = [
+    { key: keys[0], name: "Our forecast", color: "var(--series-1)" },
+    { key: keys[1], name: "Operator forecast", color: "var(--series-2)" },
+  ];
   return (
     <div>
-      <div className="controls">
-        <label htmlFor="scope">Hours</label>
-        <select id="scope" value={scope} onChange={(event) => setScope(event.target.value as "other" | "all")}>
-          <option value="other">Outside 09:00-17:00 Pacific</option>
-          <option value="all">All hours</option>
-        </select>
-      </div>
-      <div className="legend">
-        <span>
-          <span className="key" style={{ borderTopColor: "var(--series-1)" }} />
-          Our forecast
-        </span>
-        <span>
-          <span className="key" style={{ borderTopColor: "var(--series-2)" }} />
-          Operator forecast
-        </span>
+      <div className="controls" style={{ justifyContent: "space-between", marginBottom: 14 }}>
+        <div className="legend" style={{ margin: 0 }}>
+          {lines.map((line) => (
+            <span key={line.name}>
+              <span className="key" style={{ borderTopColor: line.color }} />
+              {line.name}
+            </span>
+          ))}
+        </div>
+        <div className="segmented" role="group" aria-label="Hours included">
+          {SCOPES.map((option) => (
+            <button key={option.key} aria-pressed={scope === option.key} onClick={() => setScope(option.key)}>
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--grid)" />
           <XAxis
             dataKey="day"
             tickLine={false}
+            tickMargin={8}
             minTickGap={24}
             axisLine={{ stroke: "var(--axis)" }}
             tick={{ fill: "var(--text-muted)", fontSize: 12 }}
@@ -56,26 +67,19 @@ export function DailyMapeChart({ points }: { points: DailyPoint[] }) {
             cursor={{ stroke: "var(--axis)", strokeWidth: 1 }}
             content={<ChartTooltip format={(value) => `${value.toFixed(2)}%`} />}
           />
-          <Line
-            type="linear"
-            dataKey={keys[0]}
-            name="Our forecast"
-            stroke="var(--series-1)"
-            strokeWidth={2}
-            dot={points.length < 20 ? { r: 3, strokeWidth: 0, fill: "var(--series-1)" } : false}
-            activeDot={{ r: 4, stroke: "var(--surface)", strokeWidth: 2 }}
-            isAnimationActive={false}
-          />
-          <Line
-            type="linear"
-            dataKey={keys[1]}
-            name="Operator forecast"
-            stroke="var(--series-2)"
-            strokeWidth={2}
-            dot={points.length < 20 ? { r: 3, strokeWidth: 0, fill: "var(--series-2)" } : false}
-            activeDot={{ r: 4, stroke: "var(--surface)", strokeWidth: 2 }}
-            isAnimationActive={false}
-          />
+          {lines.map((line) => (
+            <Line
+              key={line.name}
+              type="linear"
+              dataKey={line.key}
+              name={line.name}
+              stroke={line.color}
+              strokeWidth={2}
+              dot={dots ? { r: 3, strokeWidth: 0, fill: line.color } : false}
+              activeDot={{ r: 4, stroke: "var(--surface)", strokeWidth: 2 }}
+              isAnimationActive={false}
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>

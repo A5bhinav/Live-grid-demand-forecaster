@@ -64,3 +64,18 @@ export function hoursAgo(iso: string | null, now: Date): string {
   if (hours < 0) return `in ${-hours} h`;
   return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
 }
+
+/** A readable name for a recorded model version. */
+export function modelLabel(version: string | null | undefined): string {
+  if (!version) return "None";
+  if (version.startsWith("seasonal_naive")) return "Seasonal naive baseline";
+  if (version.startsWith("gbm_")) return "LightGBM";
+  return version;
+}
+
+/** The ISO day `days` after `isoDay`. */
+export function addDays(isoDay: string, days: number): string {
+  const date = new Date(`${isoDay}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
