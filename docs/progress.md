@@ -321,3 +321,15 @@ Full model by month, 2025-10 to 2026-09: 2.59, 3.68, 3.90, 3.19, 3.41, 3.15, 2.9
 **Open issues**
 - Not installed. The token supplied for it was a classic token carrying every scope on the account (including `delete_repo` and `admin:org`) and expiring 2026-11-11. Storing that in a database for a job that needs one permission on one repository is not a risk worth taking, so installation is waiting on a fine-grained token.
 - Whether GitHub's own scheduler has started firing was still unknown when this was written.
+
+## Outside scheduler installed (2026-10-12, 21:44 UTC)
+
+- Installed on Supabase with a fine-grained GitHub token limited to this repository with "Actions: Read and write" and no expiry. Six `pg_cron` jobs are active: ingest, issue, issue backup, score, monitor and retrain.
+- A test call from the database was accepted by GitHub (HTTP 204) and started a monitor run, which passed all six checks, including "outside scheduler: 0 of 1 recent calls refused".
+- The publishable key cannot call the dispatch function: Supabase answers 404, and 406 when the `scheduler` schema is requested explicitly.
+- GitHub's own scheduler did start: `ingest` ran on schedule at 21:16 UTC and `retrain` ran at 21:25 UTC, about 8.5 hours after its 12:47 slot. Earlier slots were delayed by hours, not dropped. Both schedulers now run; every job is safe to run twice.
+- The late retrain promoted `gbm_full-20261012T2125-8f135ab`, the same configuration trained on the same data as the version before it.
+
+**Open issues**
+- The token has no expiry, so it will not lapse, but it also never rotates by itself.
+- With both schedulers working, each slot can run twice, and retraining can happen twice in a week.
