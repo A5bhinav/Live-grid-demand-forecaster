@@ -1,0 +1,34 @@
+name: retrain
+
+on:
+  schedule:
+    - cron: "47 12 * * 1" # Mondays 05:47 PDT / 04:47 PST, well before the daily issue run
+  workflow_dispatch:
+
+concurrency:
+  group: retrain
+  cancel-in-progress: false
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+      # Trains a candidate, judges it on the last 28 settled days against what was
+      # actually issued, and makes it the active model only if it holds up.
+      - run: uv run --no-sync python -m gridcast.jobs.retrain
+      - if: failure()
+        run: >-
+          uv run --no-sync python -m gridcast.alerts
+          "${{ github.workflow }} workflow failed:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

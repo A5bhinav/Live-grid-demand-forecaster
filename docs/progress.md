@@ -193,3 +193,98 @@ Seasonal naive by month, 2025-10 to 2026-09: 5.23, 4.10, 4.82, 3.84, 5.44, 7.31,
 - No alerting beyond GitHub's failure email (M6). If the issue workflow fails, that day is missing from the record.
 - GitHub disables scheduled workflows in a public repo after 60 days without repository activity.
 - The first forecast was issued about six hours earlier in the day than the scheduled run will be. It used the same demand cutoff (end of the previous local day), so the inputs are the same as a 09:23 run would have had.
+
+## M4: LightGBM and ablations (2026-10-12)
+
+**What changed**
+- `Sources` and `IssueInputs` now carry weather. `build_inputs` keeps only day-2 forecasts from the pinned model, valid no later than the last target hour.
+- `gridcast.features.build.feature_frame`: calendar (hour, weekday, month, holidays, DST), demand lags at the same local hour 2, 3, 7, 8 and 14 days back plus daily summaries, temperature (per location, mean, min, max, degree hours, change against 2 and 7 days earlier, dew point, humidity) and solar, cloud, wind and rain. The backtest and the issue job both call it.
+- `gridcast.models.gbm.GbmForecaster`: one LightGBM model across all target hours, predicting MW. The round count is chosen by early stopping on the last 28 days of each training window, then the model is refit on the whole window. Hyperparameters are fixed; nothing was tuned on the backtest months.
+- Training labels are screened as of each origin's cutoff, and flagged hours are not learned from.
+- `gridcast.models.registry` and `sql/migrations/0005_model_versions.sql`: versions and the active flag in Postgres, artifacts in a private Supabase Storage bucket (`models`), or on disk when no Supabase project is configured.
+- `gridcast.jobs.retrain` and `retrain.yml` (Mondays 12:47 UTC): a copy of the candidate trained only on data before the last 28 settled days forecasts those days; it is promoted if its MAPE is within 2% (relative) of what was actually issued on the same hours. Days with no live forecast count the seasonal-naive baseline.
+- The issue job forecasts with the active version and falls back to seasonal naive if there is none. It no longer records a second forecast for a day that already has one, whichever model made the first.
+- 153 tests (25 new). The leakage tests replace demand after the cutoff and weather after the last target with absurd values and assert that features, training and forecasts do not change.
+
+**Backtest: 2025-10 to 2026-09** (8,710 scored hours, monthly origins, expanding window from 2024-01-20)
+
+| | MAPE | MAE (MW) | RMSE (MW) | Peak error (MW, mean abs) | Days beating operator |
+|---|---|---|---|---|---|
+| Seasonal naive | 6.68% | 1,873 | 2,802 | 2,472 | 76.0% |
+| LightGBM: calendar and lags | 4.59% | 1,293 | 1,889 | 1,697 | 91.5% |
+| LightGBM: plus temperature | 3.43% | 944 | 1,300 | 1,171 | 97.3% |
+| LightGBM: full | 3.40% | 939 | 1,293 | 1,151 | 97.8% |
+| Operator forecast | 8.97% | 2,454 | 3,734 | 879 | |
+
+| MAPE | Seasonal naive | Calendar and lags | Plus temperature | Full | Operator |
+|---|---|---|---|---|---|
+| 09:00-17:00 local | 8.41% | 5.87% | 4.73% | 4.74% | 19.82% |
+| Other hours | 5.82% | 3.95% | 2.78% | 2.73% | 3.55% |
+| Winter | 4.68% | 3.80% | 3.73% | 3.51% | 7.91% |
+| Spring | 6.38% | 4.62% | 3.06% | 3.06% | 10.56% |
+| Summer | 7.26% | 5.48% | 3.52% | 3.56% | 8.80% |
+| Fall | 8.41% | 4.45% | 3.42% | 3.48% | 8.61% |
+
+Full model by month, 2025-10 to 2026-09: 2.59, 3.68, 3.90, 3.19, 3.41, 3.15, 2.98, 3.04, 3.27, 3.98, 3.42, 4.20.
+
+**What the table means**
+- The full model halves seasonal naive's error (3.40% against 6.68%). Temperature is what matters: it takes the calendar-and-lags model from 4.59% to 3.43%. Solar, cloud, wind and rain add almost nothing (3.43% to 3.40%).
+- Against the operator, the only fair comparison is outside 09:00-17:00, where the two series are on the same basis: 2.73% against 3.55%. The all-hours "win" (3.40% against 8.97%) is mostly the midday mismatch and should not be quoted.
+- The operator is still better at the daily peak: 879 MW mean absolute error against 1,151 MW.
+- These are backtest numbers on revised demand. The live record will show whether they hold.
+
+**Decisions made before looking at the backtest months**
+- Target: MW rather than demand divided by a trailing 7-day mean. On July to September 2025, which is before the backtest window, the MW target scored 2.95% and the normalized target 3.43%.
+
+**Promotion**
+- `gbm_full-20261012T1033-000a2b4` is active on Supabase. Gate over 2026-09-11 to 2026-10-08 (672 hours): candidate 3.64%, baseline 12.79% (no live forecasts existed for those days yet). The artifact is 1.7 MB; neither it nor `model_versions` is readable with the publishable key.
+- The version label carries the commit that was checked out (`000a2b4`), but the model was trained with the uncommitted M4 code on top of it. Versions produced by the workflow will carry the right commit.
+- Its forecast for 2026-10-13 would have been 22,092 to 27,461 MW. The recorded forecast for that day is seasonal naive's 27,698 to 45,505 MW, which copies a hot day from the week before; reported demand on 2026-10-11 peaked at 27,082 MW. That first live day will score badly for the baseline, and it stays in the record.
+
+**Weather forecast timing, checked 2026-10-12**
+- The archive's `_previous_day2` value for an hour comes from the latest model run started at least 48 hours before it. For hours further ahead than that, the API returns the latest run, and the value changes with each new run until the 48-hour mark.
+- At the scheduled issue time (16:23 UTC) the 06:00 UTC run is the last one that can feed any hour of the next Pacific day, so the values the live job reads are final, provided that run has been published and ingested. If it were late, the last two or three target hours would differ from what a later backtest sees.
+
+**Open issues**
+- How to report the head-to-head with the operator is still undecided.
+- The live job does not record the feature values it used, so a difference between live inputs and later backtest inputs (revised demand, a late weather run) cannot be measured after the fact.
+- An artifact is tied to the feature code that produced it. Changing a feature the active model uses requires retraining and promoting in the same release.
+- 12-month backtest results are printed and logged here, not stored in the database; the dashboard's backtest page will need them.
+- Hyperparameters are untuned defaults.
+
+## M5: Dashboard (2026-10-12)
+
+**What changed**
+- `sql/migrations/0006_dashboard_views.sql`: five views (`dashboard_hourly`, `dashboard_scores`, `dashboard_backtest`, `dashboard_flags_monthly`, `dashboard_status`) granted to the role behind the publishable key, and a `backtest_results` table. The tables stay closed; the views are owned by the table owner and read through row-level security on purpose, which Supabase's advisor will report as "security definer" views.
+- `gridcast.jobs.backtest --save` stores a run's tables for the dashboard.
+- `web/`: a Next.js app with four pages (forecast, scoreboard, backtest, data quality), reading the views server-side with the publishable key and refreshing every 5 minutes. Charts are Recharts with hover readouts and a table alternative.
+- CI builds the web app.
+- 17 new tests: the public role can read each view and cannot read or change any table.
+
+**Key numbers**
+- Backtest run saved to Supabase: 95 result rows.
+- The app builds and all four pages render from Supabase with the publishable key. Checked locally in dark and light mode.
+
+**Decision applied without confirmation**
+- The scoreboard and backtest pages present the head-to-head with the operator for hours outside 09:00-17:00 Pacific, and show the model's all-hours error separately. This was my recommendation and the question was still open; every score row stores both, so switching is a change to the pages only.
+
+**Open issues**
+- Not deployed. Creating the Vercel project is a step for the repository owner: import the repo, set the root directory to `web`, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- The scoreboard is empty until the first day is scored on 2026-10-17.
+- The phone layout was not verified: headless Chrome would not render narrower than about 500 px.
+
+## M6: Monitoring and README (2026-10-12)
+
+**What changed**
+- `gridcast.jobs.monitor` and `monitor.yml` (daily 19:07 UTC, after the 11:00 Pacific deadline in both PDT and PST). Checks: tomorrow's forecast recorded; no reported-demand hours missing in the last 24 due hours; flagged share of the last week at most 5%; weather complete for tomorrow at all six locations; rolling 7-day live MAPE at most 1.5 times the saved backtest MAPE once three days are scored.
+- A failing check exits non-zero, which triggers GitHub's failure email, and posts to `ALERT_WEBHOOK_URL` if set (Slack or Discord).
+- Every scheduled workflow posts to the same webhook when it fails.
+- README rewritten: results, architecture diagram, the leakage rules, limitations, setup and operations.
+- 181 tests in total (11 new for monitoring and alerts).
+
+**Key numbers**
+- Monitor run against Supabase on 2026-10-12 10:47 UTC: all five checks passed (forecast not yet due that day; 0 of 24 demand hours missing; 0 of 168 hours flagged; 144 of 144 location-hours of weather; too few scored days to judge performance).
+
+**Open issues**
+- No webhook is configured, so delivery to Slack or Discord has only been exercised in tests.
+- The monitor reports problems; it does not retry a failed issue run.

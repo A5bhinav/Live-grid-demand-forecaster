@@ -8,7 +8,9 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "holidays>=0.106",
     "httpx>=0.28.1",
+    "lightgbm>=4.7.0",
     "pandas>=3.0.6",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.15.0",

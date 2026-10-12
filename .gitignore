@@ -14,9 +14,15 @@ build/
 .ruff_cache/
 .ipynb_checkpoints/
 
+# Local model artifacts (production ones live in Supabase Storage)
+artifacts/
+
 # Node (web/)
 node_modules/
 .next/
 
 # OS
 .DS_Store
+
+# Next.js generated types
+next-env.d.ts

@@ -14,7 +14,8 @@ from gridcast.features.build import IssueInputs, Sources, build_inputs
 
 
 class Forecaster(Protocol):
-    name: str
+    name: str  # column name in backtests
+    version: str  # recorded on live forecast rows
 
     def fit(self, sources: Sources, first_issue_date: date) -> None:
         """Train using only what `build_inputs` exposes for issue dates before this one."""

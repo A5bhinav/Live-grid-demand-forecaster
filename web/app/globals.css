@@ -1,0 +1,233 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  --actual: #0b0b0b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --actual: #f0efec;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+a {
+  color: inherit;
+}
+.shell {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+header.site {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 24px;
+  margin-bottom: 24px;
+}
+header.site h1 {
+  font-size: 18px;
+  margin: 0;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+nav a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 4px 0;
+}
+nav a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+h2 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+h3 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+p.lede {
+  color: var(--text-secondary);
+  margin: 0 0 20px;
+  max-width: 70ch;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.tile .label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.tile .value {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.tile .value.small {
+  font-size: 16px;
+}
+.tile .note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+}
+th,
+td {
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+th {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+.note {
+  color: var(--text-secondary);
+  font-size: 13px;
+  max-width: 80ch;
+}
+.empty {
+  color: var(--text-secondary);
+  padding: 24px 0;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--axis);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.legend .key {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: baseline;
+  margin-right: 6px;
+}
+.tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.tooltip .title {
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.tooltip .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tooltip .row strong {
+  font-variant-numeric: tabular-nums;
+}
+details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 8px;
+}

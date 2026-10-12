@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 15
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -23,3 +24,8 @@ jobs:
       - run: uv sync --locked --no-dev
       # Scores each forecast day 72 hours after it ends, once.
       - run: uv run --no-sync python -m gridcast.jobs.score
+      - if: failure()
+        run: >-
+          uv run --no-sync python -m gridcast.alerts
+          "${{ github.workflow }} workflow failed:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

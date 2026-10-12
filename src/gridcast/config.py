@@ -61,6 +61,21 @@ DEMAND_CUTOFF_HOUR_LOCAL = 0
 SCORING_DELAY_HOURS = 72  # wait for revisions to settle before scoring a target day
 FEATURE_LOOKBACK_DAYS = 90  # demand history screened and exposed to a forecast
 
+# --- Modeling (CLAUDE.md §6) ---
+TRAIN_START = date(2024, 1, 20)  # first issue date whose target day has weather forecasts
+DEGREE_HOUR_BASE_C = 18.0
+EARLY_STOPPING_DAYS = 28  # tail of each training window held out to choose the round count
+GATE_DAYS = 28  # recent settled days a candidate is judged on before promotion
+PROMOTION_TOLERANCE = 0.02  # candidate MAPE may exceed the live record's by this fraction
+MODEL_BUCKET = "models"
+
+# --- Monitoring (CLAUDE.md §10) ---
+FORECAST_DUE_HOUR_LOCAL = 11  # tomorrow's forecast must be recorded by this hour
+DEMAND_PUBLICATION_LAG_HOURS = 6  # reported demand older than this should be present
+MAX_FLAGGED_SHARE = 0.05  # of the last 7 days of demand
+PERFORMANCE_ALERT_RATIO = 1.5  # rolling 7-day MAPE against the backtest MAPE
+MIN_SCORED_DAYS_FOR_ALERT = 3
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True, extra="ignore")
@@ -69,6 +84,7 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     supabase_url: str | None = None
     supabase_service_role_key: SecretStr | None = None
+    alert_webhook_url: SecretStr | None = None  # Slack or Discord; optional
 
     def require_eia_api_key(self) -> str:
         if self.eia_api_key is None:

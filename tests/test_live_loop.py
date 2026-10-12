@@ -8,6 +8,7 @@ from test_screen import synthetic_demand
 from gridcast import config, db, protocol
 from gridcast.ingest.eia import EiaRow
 from gridcast.jobs import issue, score
+from gridcast.models.baselines import SeasonalNaive
 
 # The database stamps real time on every forecast, so these tests are anchored to today.
 NOW = datetime.now(UTC)
@@ -108,9 +109,9 @@ def test_issue_job_records_tomorrow_exactly_once(conn: psycopg.Connection) -> No
     load_raw(conn, demand, demand * 1.02)
     targets = protocol.target_periods(TODAY)
 
-    first = issue.run(conn, NOW)
+    first = issue.run(conn, SeasonalNaive(), NOW)
     conn.commit()
-    second = issue.run(conn, NOW)
+    second = issue.run(conn, SeasonalNaive(), NOW)
     conn.commit()
 
     assert first.inserted == len(targets)
@@ -130,7 +131,7 @@ def test_issue_job_dry_run_records_nothing(conn: psycopg.Connection) -> None:
     demand = published_demand()
     load_raw(conn, demand, demand)
 
-    stats = issue.run(conn, NOW, dry_run=True)
+    stats = issue.run(conn, SeasonalNaive(), NOW, dry_run=True)
 
     assert stats.forecast.notna().all()
     assert stats.inserted == 0
@@ -142,7 +143,7 @@ def test_issue_job_fails_rather_than_record_a_partial_forecast(conn: psycopg.Con
     load_raw(conn, demand, demand)
 
     with pytest.raises(RuntimeError, match="has no value for"):
-        issue.run(conn, NOW)
+        issue.run(conn, SeasonalNaive(), NOW)
 
     assert conn.execute("select count(*) from forecasts").fetchone() == (0,)
 
@@ -205,3 +206,22 @@ def test_a_day_with_no_operator_forecast_is_recorded_as_unscored(
     assert "mape" not in row
     assert conn.execute("select hours_scored, mape from scores").fetchall() == [(0, None)]
     assert score.run(conn, NOW) == []
+
+
+class OtherModel(SeasonalNaive):
+    version = "other-model-v1"
+
+
+def test_a_newly_promoted_model_cannot_add_a_second_forecast_for_the_same_day(
+    conn: psycopg.Connection,
+) -> None:
+    demand = published_demand()
+    load_raw(conn, demand, demand)
+    issue.run(conn, SeasonalNaive(), NOW)
+    conn.commit()
+
+    second = issue.run(conn, OtherModel(), NOW)
+
+    assert (second.inserted, second.already_issued) == (0, True)
+    versions = conn.execute("select distinct model_version from forecasts").fetchall()
+    assert versions == [("seasonal_naive-v1",)]

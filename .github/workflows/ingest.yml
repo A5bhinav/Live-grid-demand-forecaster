@@ -16,6 +16,7 @@ jobs:
     env:
       EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -25,3 +26,8 @@ jobs:
       # Re-pulls the trailing 7 days, so revisions overwrite earlier values.
       - run: uv run --no-sync python -m gridcast.jobs.ingest
       - run: uv run --no-sync python -m gridcast.jobs.clean
+      - if: failure()
+        run: >-
+          uv run --no-sync python -m gridcast.alerts
+          "${{ github.workflow }} workflow failed:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

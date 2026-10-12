@@ -1,6 +1,7 @@
 """Postgres access: connections, migrations, and idempotent upserts for the raw tables."""
 
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -217,3 +218,51 @@ def insert_scores(conn: psycopg.Connection, scores: Iterable[dict[str, object]])
         )
         inserted += result.rowcount
     return inserted
+
+
+def read_raw_weather(conn: psycopg.Connection, since: datetime | None = None) -> pd.DataFrame:
+    """Archived weather forecasts: one row per location, valid time, lead and model."""
+    variables = config.WEATHER_VARIABLES
+    rows = conn.execute(
+        sql.SQL(
+            "select location, valid_time_utc, lead_days, model, {} from raw_weather "
+            "where valid_time_utc >= coalesce(%s, '-infinity'::timestamptz) "
+            "order by valid_time_utc, location"
+        ).format(sql.SQL(", ").join(map(sql.Identifier, variables))),
+        (since,),
+    ).fetchall()
+    frame = pd.DataFrame(
+        rows, columns=["location", "valid_time_utc", "lead_days", "model", *variables]
+    )
+    frame["valid_time_utc"] = pd.to_datetime(frame["valid_time_utc"], utc=True)
+    frame[list(variables)] = frame[list(variables)].astype(float)
+    return frame
+
+
+def read_live_forecasts(conn: psycopg.Connection, since: datetime) -> pd.Series:
+    """What was actually issued: the first forecast recorded for each hour, any model."""
+    rows = conn.execute(
+        "select distinct on (target_time_utc) target_time_utc, yhat_mw from forecasts "
+        "where target_time_utc >= %s order by target_time_utc, issued_at",
+        (since,),
+    ).fetchall()
+    index = pd.DatetimeIndex(
+        pd.to_datetime([period for period, _ in rows], utc=True), name="period_utc"
+    )
+    return pd.Series([float(value) for _, value in rows], index=index, dtype=float)
+
+
+def insert_backtest_results(conn: psycopg.Connection, results: pd.DataFrame) -> int:
+    """Store one backtest run for the dashboard. `results` has the table's columns."""
+    columns = list(results.columns)
+    statement = sql.SQL("insert into backtest_results ({}) values ({})").format(
+        sql.SQL(", ").join(map(sql.Identifier, columns)),
+        sql.SQL(", ").join(sql.Placeholder() * len(columns)),
+    )
+    rows = [
+        tuple(None if pd.isna(value) else value for value in row)
+        for row in results.astype(object).itertuples(index=False, name=None)
+    ]
+    with conn.cursor() as cur:
+        cur.executemany(statement, rows)
+        return cur.rowcount

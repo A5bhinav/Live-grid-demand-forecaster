@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 
 from gridcast import protocol, scoring
+from gridcast.features.build import Sources
 from gridcast.jobs.backtest import backtest_report
 from gridcast.models.baselines import SeasonalNaive
 
@@ -111,7 +112,7 @@ def test_backtest_report_scores_baseline_and_operator_on_the_same_hours() -> Non
     operator = operator.drop(operator.index[2500:2524])  # the operator skips a day
     months = [pd.Period("2025-09", freq="M")]
 
-    report = backtest_report([SeasonalNaive()], raw_demand, operator, months)
+    report = backtest_report([SeasonalNaive()], Sources(raw_demand=raw_demand), operator, months)
     overall = report.overall()
 
     assert report.models == ["seasonal_naive", "operator"]

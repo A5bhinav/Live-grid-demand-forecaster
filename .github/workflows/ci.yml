@@ -34,3 +34,19 @@ jobs:
       # Tests run on fixtures and the Postgres service above; tests/conftest.py blocks
       # outbound connections from Python.
       - run: uv run pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # Type-checks and builds. Without Supabase settings the pages render a notice.
+      - run: npm run build
