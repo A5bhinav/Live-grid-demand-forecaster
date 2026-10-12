@@ -89,6 +89,18 @@ def performance(conn: psycopg.Connection) -> Check:
     return Check("performance", live <= limit, detail)
 
 
+def outside_scheduler(conn: psycopg.Connection) -> Check:
+    """Where the outside scheduler is installed, GitHub accepted its recent calls."""
+    if conn.execute("select to_regclass('net._http_response')").fetchone()[0] is None:
+        return Check("outside scheduler", True, "not installed")
+    refused, calls = conn.execute(
+        "select count(*) filter "
+        "(where error_msg is not null or status_code not between 200 and 299), count(*) "
+        "from net._http_response"
+    ).fetchone()
+    return Check("outside scheduler", refused == 0, f"{refused} of {calls} recent calls refused")
+
+
 def run(conn: psycopg.Connection, now: datetime) -> list[Check]:
     return [
         forecast_issued(conn, now),
@@ -96,6 +108,7 @@ def run(conn: psycopg.Connection, now: datetime) -> list[Check]:
         flagged_share(conn),
         weather_complete(conn, now),
         performance(conn),
+        outside_scheduler(conn),
     ]
 
 

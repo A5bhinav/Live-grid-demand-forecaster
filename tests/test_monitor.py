@@ -44,6 +44,7 @@ def test_a_healthy_pipeline_passes_every_check(healthy: psycopg.Connection) -> N
         "flagged share": True,
         "weather complete": True,
         "performance": True,
+        "outside scheduler": True,
     }
 
 
@@ -146,3 +147,35 @@ def test_no_alert_is_sent_without_a_webhook() -> None:
     client = httpx.Client(transport=httpx.MockTransport(handler))
 
     assert not alerts.send_alert("forecast missing", None, client)
+
+
+@pytest.mark.parametrize(
+    ("responses", "ok", "detail"),
+    [
+        ([(204, None), (204, None)], True, "0 of 2 recent calls refused"),
+        ([(204, None), (401, None)], False, "1 of 2 recent calls refused"),
+        ([(None, "timeout")], False, "1 of 1 recent calls refused"),
+    ],
+)
+def test_refused_calls_from_the_outside_scheduler_are_reported(
+    conn: psycopg.Connection, responses: list[tuple[int | None, str | None]], ok: bool, detail: str
+) -> None:
+    # Stands in for pg_net's response log, which only exists on Supabase.
+    conn.execute("create schema net")
+    conn.execute("create table net._http_response (status_code int, error_msg text)")
+    try:
+        for response in responses:
+            conn.execute("insert into net._http_response values (%s, %s)", response)
+
+        check = monitor.outside_scheduler(conn)
+    finally:
+        conn.execute("drop schema net cascade")
+
+    assert (check.ok, check.detail) == (ok, detail)
+
+
+def test_installing_the_outside_scheduler_requires_a_token(conn: psycopg.Connection) -> None:
+    from gridcast.jobs import scheduler
+
+    with pytest.raises(RuntimeError, match="GITHUB_DISPATCH_TOKEN is not set"):
+        scheduler.install(conn, None)

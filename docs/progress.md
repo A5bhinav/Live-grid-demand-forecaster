@@ -309,3 +309,15 @@ Full model by month, 2025-10 to 2026-09: 2.59, 3.68, 3.90, 3.19, 3.41, 3.15, 2.9
 
 **Open issues**
 - Backup slots only help if GitHub's scheduler runs at all for this repository. If it does not, the workflows need an outside trigger (for example a scheduled call to GitHub's workflow-dispatch API), which needs a GitHub token only the repository owner can create.
+
+## Outside scheduler (2026-10-12)
+
+**What changed**
+- `sql/supabase/scheduler.sql` and `gridcast.jobs.scheduler` (`install`, `status`, `remove`): Supabase's `pg_cron` calls GitHub's workflow-dispatch API through `pg_net` on the workflows' timetable, reading a GitHub token from Vault. The function lives in a `scheduler` schema that Supabase does not serve over its API.
+- The monitor has a sixth check: where the outside scheduler is installed, none of its recent calls was refused.
+- `vercel.json` at the repository root declares the dashboard as the only service. Vercel's suggested config treated the repository root as a Python web service and routed all traffic to it; there is no such service.
+- 185 tests.
+
+**Open issues**
+- Not installed. The token supplied for it was a classic token carrying every scope on the account (including `delete_repo` and `admin:org`) and expiring 2026-11-11. Storing that in a database for a job that needs one permission on one repository is not a risk worth taking, so installation is waiting on a fine-grained token.
+- Whether GitHub's own scheduler has started firing was still unknown when this was written.

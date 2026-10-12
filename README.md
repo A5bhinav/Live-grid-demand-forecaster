@@ -132,6 +132,16 @@ GitHub Actions needs these repository secrets: `EIA_API_KEY`, `DATABASE_URL`, `S
 
 GitHub can delay or drop scheduled runs, which is why the issue job has backup slots: the first forecast recorded for a day stands, so the extra runs are harmless. GitHub also disables scheduled workflows in a public repository after 60 days without repository activity.
 
+### Outside scheduler (optional)
+
+If GitHub's scheduler proves unreliable, Supabase can trigger the same workflows itself: `pg_cron` calls GitHub's workflow-dispatch API on the same timetable. The workflows' own schedules stay in place as a backup, and every job is safe to run twice.
+
+1. Create a fine-grained GitHub token limited to this repository, with the single permission "Actions: Read and write".
+2. Put it in `.env` as `GITHUB_DISPATCH_TOKEN`.
+3. Run `uv run python -m gridcast.jobs.scheduler install`. This stores the token in Supabase Vault and creates the cron jobs. Remove the token from `.env` afterwards.
+
+`uv run python -m gridcast.jobs.scheduler status` lists the jobs and GitHub's recent responses, and `remove` undoes the installation. The monitor reports any call GitHub refused, which is what an expired token looks like.
+
 ## Dashboard
 
 `web/` is a Next.js app that reads only the `dashboard_*` views with Supabase's publishable key. The tables themselves are closed to that key.

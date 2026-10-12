@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: SecretStr | None = None
     alert_webhook_url: SecretStr | None = None  # Slack or Discord; optional
+    github_dispatch_token: SecretStr | None = None  # only for jobs.scheduler install
 
     def require_eia_api_key(self) -> str:
         if self.eia_api_key is None:
