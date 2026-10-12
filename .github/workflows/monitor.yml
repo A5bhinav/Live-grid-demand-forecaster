@@ -3,6 +3,7 @@ name: monitor
 on:
   schedule:
     - cron: "7 19 * * *" # 12:07 PDT / 11:07 PST, after the 11:00 Pacific forecast deadline
+    - cron: "7 23 * * *" # a second look, in case the first run is dropped
   workflow_dispatch:
 
 concurrency:

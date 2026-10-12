@@ -125,12 +125,12 @@ GitHub Actions needs these repository secrets: `EIA_API_KEY`, `DATABASE_URL`, `S
 | Workflow | Schedule (UTC) |
 |---|---|
 | `ingest.yml` | every 3 hours at :17 |
-| `issue.yml` | daily 16:23 (09:23 PDT / 08:23 PST) |
+| `issue.yml` | daily 16:23 (09:23 PDT / 08:23 PST), with backup runs at 17:53, 19:23 and 21:53 |
 | `score.yml` | daily 17:41 |
-| `monitor.yml` | daily 19:07 |
+| `monitor.yml` | daily 19:07 and 23:07 |
 | `retrain.yml` | Mondays 12:47 |
 
-GitHub disables scheduled workflows in a public repository after 60 days without repository activity.
+GitHub can delay or drop scheduled runs, which is why the issue job has backup slots: the first forecast recorded for a day stands, so the extra runs are harmless. GitHub also disables scheduled workflows in a public repository after 60 days without repository activity.
 
 ## Dashboard
 

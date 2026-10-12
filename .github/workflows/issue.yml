@@ -3,6 +3,12 @@ name: issue
 on:
   schedule:
     - cron: "23 16 * * *" # 09:23 PDT / 08:23 PST, before 10:00 Pacific all year
+    # Backups, because GitHub can delay or drop a scheduled run. The first forecast
+    # recorded for a day stands and every run uses the same demand cutoff, so a later
+    # run changes nothing once the day is recorded.
+    - cron: "53 17 * * *"
+    - cron: "23 19 * * *"
+    - cron: "53 21 * * *"
   workflow_dispatch:
 
 concurrency:

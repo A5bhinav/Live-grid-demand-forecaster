@@ -288,3 +288,24 @@ Full model by month, 2025-10 to 2026-09: 2.59, 3.68, 3.90, 3.19, 3.41, 3.15, 2.9
 **Open issues**
 - No webhook is configured, so delivery to Slack or Discord has only been exercised in tests.
 - The monitor reports problems; it does not retry a failed issue run.
+
+## Verification pass (2026-10-12, about 20:40 UTC)
+
+**Checked**
+- Repository clean and pushed; CI green; all six workflows active; four secrets set.
+- Supabase: six migrations applied, row-level security on every table with no policies, forecast triggers enabled, 58 MB. The publishable key reads the five dashboard views, gets no rows from any table, cannot insert a forecast (HTTP 401) and sees nothing in the model bucket.
+- Numbers re-derived independently in plain SQL from `raw_eia`: October 2025 seasonal-naive MAPE 5.23% and operator MAPE 9.25% over 744 hours, matching the backtest job exactly.
+- One feature row rebuilt by hand from the raw tables (issue date 2026-08-10): the lag, temperature, cutoff and local-hour values all match.
+- No feature equals the target; the strongest correlation is `demand_lag_2d` at 0.85.
+- The model promoted by the GitHub workflow gives the same forecast for 2026-10-13 as the one trained locally (22,092 to 27,461 MW), and the same gate result.
+- Web app: clean `npm ci` and build, with and without Supabase settings; all four pages serve live data.
+
+**Problem found**
+- GitHub had fired no scheduled run in the 10 hours since the workflows were pushed: three ingest slots and the issue, score and monitor slots all passed with nothing. Manual runs of every workflow succeed. GitHub reported a minor Actions incident at 12:21 UTC; that alone does not explain six missed slots. The cause is not established.
+- Effect so far: data went 10.7 hours stale until an ingest was triggered by hand. Nothing was lost from the forecast record, since the day's forecast was already recorded.
+
+**What changed**
+- `issue.yml` has backup slots at 17:53, 19:23 and 21:53 UTC, and `monitor.yml` a second slot at 23:07 UTC. The first forecast recorded for a day stands, so the extra runs are harmless.
+
+**Open issues**
+- Backup slots only help if GitHub's scheduler runs at all for this repository. If it does not, the workflows need an outside trigger (for example a scheduled call to GitHub's workflow-dispatch API), which needs a GitHub token only the repository owner can create.
