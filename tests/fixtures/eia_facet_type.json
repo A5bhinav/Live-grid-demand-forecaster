@@ -1,0 +1,29 @@
+{
+    "response": {
+        "totalFacets": 4,
+        "facets": [
+            {
+                "id": "DF",
+                "name": "Day-ahead demand forecast"
+            },
+            {
+                "id": "NG",
+                "name": "Net generation"
+            },
+            {
+                "id": "D",
+                "name": "Demand"
+            },
+            {
+                "id": "TI",
+                "name": "Total interchange"
+            }
+        ]
+    },
+    "request": {
+        "command": "/v2/electricity/rto/region-data/facet/type/",
+        "params": []
+    },
+    "apiVersion": "2.1.14",
+    "ExcelAddInVersion": "2.1.0"
+}

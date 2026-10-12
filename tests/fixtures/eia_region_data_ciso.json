@@ -1,0 +1,148 @@
+{
+    "response": {
+        "total": "12",
+        "dateFormat": "YYYY-MM-DD\"T\"HH24",
+        "frequency": "hourly",
+        "data": [
+            {
+                "period": "2026-10-09T00",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "D",
+                "type-name": "Demand",
+                "value": "42502",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T00",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "DF",
+                "type-name": "Day-ahead demand forecast",
+                "value": "43071",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T01",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "D",
+                "type-name": "Demand",
+                "value": "41714",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T01",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "DF",
+                "type-name": "Day-ahead demand forecast",
+                "value": "44114",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T02",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "D",
+                "type-name": "Demand",
+                "value": "40626",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T02",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "DF",
+                "type-name": "Day-ahead demand forecast",
+                "value": "43008",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T03",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "D",
+                "type-name": "Demand",
+                "value": "38942",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T03",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "DF",
+                "type-name": "Day-ahead demand forecast",
+                "value": "41268",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T04",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "D",
+                "type-name": "Demand",
+                "value": "37095",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T04",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "DF",
+                "type-name": "Day-ahead demand forecast",
+                "value": "39285",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T05",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "D",
+                "type-name": "Demand",
+                "value": "35499",
+                "value-units": "megawatthours"
+            },
+            {
+                "period": "2026-10-09T05",
+                "respondent": "CISO",
+                "respondent-name": "California Independent System Operator",
+                "type": "DF",
+                "type-name": "Day-ahead demand forecast",
+                "value": "37388",
+                "value-units": "megawatthours"
+            }
+        ],
+        "description": "Hourly demand, day-ahead demand forecast, net generation, and interchange by balancing authority.  \n    Source: Form EIA-930\n    Product: Hourly Electric Grid Monitor"
+    },
+    "request": {
+        "command": "/v2/electricity/rto/region-data/data/",
+        "params": {
+            "frequency": "hourly",
+            "data": [
+                "value"
+            ],
+            "facets": {
+                "respondent": [
+                    "CISO"
+                ],
+                "type": [
+                    "D",
+                    "DF"
+                ]
+            },
+            "start": "2026-10-09T00",
+            "end": "2026-10-09T05",
+            "sort": [
+                {
+                    "column": "period",
+                    "direction": "asc"
+                }
+            ],
+            "offset": "0",
+            "length": "5000"
+        }
+    },
+    "apiVersion": "2.1.14",
+    "ExcelAddInVersion": "2.1.0"
+}
