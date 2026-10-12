@@ -60,3 +60,32 @@
 - `_previous_day2` is populated for hours more than two days ahead (seen out to +4 days), so values for far-future hours are presumably provisional and settle once the valid time is within 48 hours. Before M3.5, confirm that the values the live job reads for D+1 match what the archive later holds, and consider snapshotting the features used at issue time.
 - No revision-history table; only the latest value and its `updated_at` are kept.
 - CI has still not run on GitHub; nothing is committed or pushed.
+
+## M2: Cleaning (2026-10-12)
+
+**What changed**
+- `gridcast.clean.screen`: `screen` flags suspect hours, `impute` fills them, `clean` does both. All three are pure functions of a demand series.
+- Flags, in the order they are applied: `missing`, `non_positive`, `global_outlier` (10x from the overall median), `repeated_value` (same value three or more times, each within a day of the last), `spike` (a jump over 4 rolling IQRs of the hourly change, reversed within 6 hours), `local_outlier_high` / `_low` (1.5x from a rolling-median estimate), `anomalous_region` (over 15% of the surrounding 24 hours flagged).
+- Imputation: gaps of up to 3 hours are interpolated; longer or trailing gaps copy the same hours a week earlier, shifted to meet the good values at the gap's edges. `anomalous_region` hours keep their reported value.
+- `sql/migrations/0002_clean_demand.sql` and `gridcast.jobs.clean`, which re-screens the full history and upserts `clean_demand`.
+- `notebooks/eda_cleaning.ipynb`, committed with outputs. Notebook dependencies are in a separate `notebooks` group and notebooks are excluded from lint.
+- 61 tests (24 new), covering synthetic gaps, zeros, negatives, spikes, stuck values, sustained level errors, a heat wave and both daylight-saving transitions that must not be flagged, and the job's idempotency.
+
+**Key numbers**
+- 122 of 68,193 hours flagged (0.18%): 54 `anomalous_region`, 24 `missing`, 24 `spike`, 17 `repeated_value`, 3 `global_outlier`. 101 of them are in 2019; no year since has more than 6.
+- 68 hours imputed, none left unfilled.
+- Imputation check on hidden good hours: 1.09% mean absolute error for 500 single hours (95th percentile 2.83%), 2.79% for fifty 8-hour blocks (95th percentile 8.38%).
+- The clean job takes under a second and a second run changes 0 rows.
+
+**Differences from the brief**
+- The local outlier screen does not use the IQR thresholds from Ruggles et al. A first version with them flagged about 5% of hours (888 "low" outliers), and reported demand matched the operator forecast on most of those, so they were real weekend middays. The screen now uses a plain 1.5x ratio and short glitches are left to the `spike` screen.
+- `clean_demand` has an `updated_at` column in addition to the sketch.
+
+**Findings that affect later milestones**
+- Reported demand (`D`) and the operator forecast (`DF`) have diverged at midday since 2023. The average gap at 12:00 local grew from 0.6 GW in 2021 to 2.4 (2023), 4.2 (2024), 5.9 (2025) and 7.8 GW (2026). The operator forecast's MAPE against `D` is 9.1% in 2026: 21.6% between 09:00 and 16:00 local and 3.0% otherwise. The two series probably no longer measure the same quantity; battery charging being counted in `D` would fit the shape but is unverified. Scoring `DF` against `D` as-is would understate the operator badly. This needs a decision before M3.
+- `DF` is absent for whole days around daylight-saving transitions since 2024 (49, 23, 25 and 23 hours), so those days have no operator benchmark.
+- Screening uses centered windows, so a flag can depend on later hours. `clean_demand` is therefore a hindsight table for scoring and the dashboard. The feature builder must call `clean` on demand truncated at the issue-time cutoff instead of reading the table; the leakage test in M3/M4 should cover this.
+
+**Open issues**
+- `DF` is not screened. It has no near-zero or stuck values, but nothing checks it.
+- The clean job is not yet part of a scheduled workflow.

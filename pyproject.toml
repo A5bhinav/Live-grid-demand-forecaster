@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.28.1",
+    "pandas>=3.0.6",
     "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.15.0",
     "tenacity>=9.2.1",
@@ -23,10 +24,16 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.17.0",
 ]
+notebooks = [
+    "ipykernel>=7.4.0",
+    "matplotlib>=3.11.2",
+    "nbconvert>=7.17.1",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["notebooks"]  # EDA only; nothing in the pipeline imports them
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

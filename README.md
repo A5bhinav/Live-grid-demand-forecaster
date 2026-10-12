@@ -2,7 +2,7 @@
 
 A live, day-ahead electricity demand forecaster for the California ISO (EIA balancing authority `CISO`). Each morning it forecasts every hour of the next day, records the forecast immutably, and later scores it against actual demand and against CAISO's own published day-ahead forecast.
 
-Status: M1 (ingest and backfill). The full design and milestone plan are in [CLAUDE.md](CLAUDE.md); progress is logged in [docs/progress.md](docs/progress.md).
+Status: M2 (cleaning). The full design and milestone plan are in [CLAUDE.md](CLAUDE.md); progress is logged in [docs/progress.md](docs/progress.md).
 
 ## Setup
 
@@ -22,8 +22,15 @@ A free EIA key is available at https://www.eia.gov/opendata/register.php.
 uv run python -m gridcast.jobs.smoke              # pull 48h of CISO demand and operator forecast, print row counts
 uv run python -m gridcast.jobs.ingest --backfill  # load EIA from 2019-01 and day-2 weather forecasts from 2024-01-20
 uv run python -m gridcast.jobs.ingest             # re-pull the trailing 7 days (run on a schedule)
+uv run python -m gridcast.jobs.clean              # screen reported demand and rebuild clean_demand
 uv run pytest                                     # fixtures plus the local database; never the network
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Ingest runs apply any pending migrations in `sql/migrations/` and upsert, so they are safe to repeat.
+The ingest and clean jobs apply any pending migrations in `sql/migrations/` and upsert, so both are safe to repeat.
+
+The cleaning EDA is in [notebooks/eda_cleaning.ipynb](notebooks/eda_cleaning.ipynb). To re-run it:
+
+```sh
+uv run --group notebooks jupyter nbconvert --to notebook --execute --inplace notebooks/eda_cleaning.ipynb
+```

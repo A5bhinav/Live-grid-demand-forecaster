@@ -3,8 +3,10 @@
 from collections.abc import Iterable
 from pathlib import Path
 
+import pandas as pd
 import psycopg
 
+from gridcast import config
 from gridcast.ingest.eia import EiaRow
 from gridcast.ingest.weather import WeatherRow
 
@@ -82,6 +84,56 @@ def upsert_weather(conn: psycopg.Connection, rows: Iterable[WeatherRow]) -> int:
             on conflict (location, valid_time_utc, lead_days, model, variable) do update
               set value = excluded.value, updated_at = now()
               where raw_weather.value is distinct from excluded.value
+            """
+        )
+        return cur.rowcount
+
+
+def read_raw_demand(conn: psycopg.Connection) -> pd.Series:
+    """Reported actual demand in MW, indexed by hour-ending UTC period."""
+    rows = conn.execute(
+        "select period_utc, value from raw_eia where respondent = %s and type = %s "
+        "order by period_utc",
+        (config.EIA_RESPONDENT, config.EIA_TYPE_DEMAND),
+    ).fetchall()
+    index = pd.DatetimeIndex(
+        pd.to_datetime([period for period, _ in rows], utc=True), name="period_utc"
+    )
+    values = [None if value is None else float(value) for _, value in rows]
+    return pd.Series(values, index=index, dtype=float, name="demand_mw")
+
+
+def upsert_clean_demand(conn: psycopg.Connection, cleaned: pd.DataFrame) -> int:
+    """Write the output of `clean`. Returns how many rows were inserted or changed."""
+    demand = cleaned["demand_mw"].round(1)
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(
+            "create temp table if not exists staging_clean_demand ("
+            "period_utc timestamptz, demand_mw numeric, flag text, imputed boolean) "
+            "on commit drop"
+        )
+        cur.execute("truncate staging_clean_demand")
+        with cur.copy("copy staging_clean_demand from stdin") as copy:
+            for period, value, flag, imputed in zip(
+                cleaned.index, demand, cleaned["flag"], cleaned["imputed"], strict=True
+            ):
+                copy.write_row(
+                    (
+                        period.to_pydatetime(),
+                        None if pd.isna(value) else float(value),
+                        None if pd.isna(flag) else str(flag),
+                        bool(imputed),
+                    )
+                )
+        cur.execute(
+            """
+            insert into clean_demand (period_utc, demand_mw, flag, imputed)
+            select period_utc, demand_mw, flag, imputed from staging_clean_demand
+            on conflict (period_utc) do update
+              set demand_mw = excluded.demand_mw, flag = excluded.flag,
+                  imputed = excluded.imputed, updated_at = now()
+              where (clean_demand.demand_mw, clean_demand.flag, clean_demand.imputed)
+                is distinct from (excluded.demand_mw, excluded.flag, excluded.imputed)
             """
         )
         return cur.rowcount
