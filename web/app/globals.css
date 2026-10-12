@@ -1,4 +1,4 @@
-/* Design tokens. Light and dark are both chosen, not derived. */
+/* Design tokens. The app is light only, whatever the device setting. */
 :root {
   color-scheme: light;
   --bg: #f6f6f4;
@@ -33,35 +33,6 @@
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #0b0b0b;
-    --surface: #1a1a19;
-    --surface-sunken: #141413;
-    --border: #2a2a28;
-    --border-strong: #3a3a37;
-    --text: #f0efec;
-    --text-secondary: #b9b8b0;
-    --text-muted: #85837d;
-    --accent: #3987e5;
-    --accent-soft: rgba(57, 135, 229, 0.16);
-    --grid: #262624;
-    --axis: #3a3a37;
-    --shadow: none;
-
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
-    --actual: #f0efec;
-  }
-}
-
 * {
   box-sizing: border-box;
 }
