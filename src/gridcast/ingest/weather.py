@@ -21,8 +21,7 @@ class WeatherRow:
     valid_time_utc: datetime
     lead_days: int
     model: str
-    variable: str
-    value: float
+    values: dict[str, float | None]  # by variable name
 
 
 def fetch_previous_runs(
@@ -56,9 +55,9 @@ def fetch_previous_runs(
     }
     hourly = get_json(client, config.WEATHER_URL, params)["hourly"]
     valid_times = [datetime.fromisoformat(stamp).replace(tzinfo=UTC) for stamp in hourly["time"]]
-    return [
-        WeatherRow(location.name, valid_time, lead_days, model, variable, float(value))
-        for variable in variables
-        for valid_time, value in zip(valid_times, hourly[variable + suffix], strict=True)
-        if value is not None
-    ]
+    rows = []
+    for position, valid_time in enumerate(valid_times):
+        values = {variable: hourly[variable + suffix][position] for variable in variables}
+        if any(value is not None for value in values.values()):
+            rows.append(WeatherRow(location.name, valid_time, lead_days, model, values))
+    return rows

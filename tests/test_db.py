@@ -13,9 +13,12 @@ def eia_rows(count: int, value: float | None = 100.0) -> list[EiaRow]:
     return [EiaRow("CISO", "D", T0 + timedelta(hours=i), value) for i in range(count)]
 
 
-def weather_rows(count: int, value: float = 20.0) -> list[WeatherRow]:
+def weather_rows(
+    count: int, temperature: float | None = 20.0, cloud_cover: float | None = 40.0
+) -> list[WeatherRow]:
+    values = {"temperature_2m": temperature, "cloud_cover": cloud_cover}
     return [
-        WeatherRow("oakland", T0 + timedelta(hours=i), 2, "gfs_global", "temperature_2m", value)
+        WeatherRow("oakland", T0 + timedelta(hours=i), 2, "gfs_global", values)
         for i in range(count)
     ]
 
@@ -90,10 +93,28 @@ def test_upsert_weather_is_idempotent_and_overwrites_revisions(conn: psycopg.Con
     assert db.upsert_weather(conn, weather_rows(24)) == 0
     conn.commit()
 
-    assert db.upsert_weather(conn, weather_rows(1, value=31.5)) == 1
+    assert db.upsert_weather(conn, weather_rows(1, temperature=31.5)) == 1
     conn.commit()
 
     assert count(conn, "raw_weather") == 24
-    assert conn.execute(
-        "select value from raw_weather where valid_time_utc = %s", (T0,)
-    ).fetchone() == (31.5,)
+    row = conn.execute(
+        "select temperature_2m, cloud_cover, precipitation, updated_at > ingested_at "
+        "from raw_weather where valid_time_utc = %s",
+        (T0,),
+    ).fetchone()
+    assert row == (31.5, 40, None, True)
+
+
+def test_upsert_weather_fills_gaps_but_never_blanks_a_stored_value(
+    conn: psycopg.Connection,
+) -> None:
+    db.upsert_weather(conn, weather_rows(1, cloud_cover=None))
+    conn.commit()
+
+    assert db.upsert_weather(conn, weather_rows(1, temperature=None, cloud_cover=55.0)) == 1
+    assert db.upsert_weather(conn, weather_rows(1, temperature=None, cloud_cover=None)) == 0
+
+    assert conn.execute("select temperature_2m, cloud_cover from raw_weather").fetchone() == (
+        20,
+        55,
+    )

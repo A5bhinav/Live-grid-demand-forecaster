@@ -1,0 +1,25 @@
+name: score
+
+on:
+  schedule:
+    - cron: "41 17 * * *" # daily, after the 15:17 UTC ingest
+  workflow_dispatch:
+
+concurrency:
+  group: score
+  cancel-in-progress: false
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+      # Scores each forecast day 72 hours after it ends, once.
+      - run: uv run --no-sync python -m gridcast.jobs.score

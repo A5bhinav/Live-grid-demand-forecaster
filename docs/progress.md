@@ -89,3 +89,107 @@
 **Open issues**
 - `DF` is not screened. It has no near-zero or stuck values, but nothing checks it.
 - The clean job is not yet part of a scheduled workflow.
+
+## Supabase preparation (2026-10-12)
+
+**What changed**
+- `sql/migrations/0003_raw_weather_wide.sql`: `raw_weather` is now one row per location and hour with a column per variable. Existing rows are pivoted across, so no re-fetch is needed.
+- `WeatherRow` carries a `values` mapping, and `upsert_weather` never overwrites a stored value with a null.
+- `SUPABASE_URL` is set in the local `.env`.
+
+**Key numbers** (local database)
+- `raw_weather`: 143,784 rows and 24 MB, down from 1,006,488 rows and 179 MB. No row has a missing variable.
+- Whole database: 51 MB, about a tenth of Supabase's 500 MB free tier.
+- A trailing ingest after the migration fetched 1,440 weather rows and changed 0, so the pivoted values match the source.
+- 63 tests pass.
+
+**Open issues**
+- Nothing has been applied to the Supabase project yet. `DATABASE_URL` in `.env` still points at the local database and `SUPABASE_SERVICE_ROLE_KEY` is empty.
+- The existing contents of the Supabase database have not been inspected: the Supabase connector available in this session has no permission on the project, so the check has to go through `DATABASE_URL`.
+- GitHub secrets are not set; the GitHub CLI is not logged in on this machine.
+
+## Supabase load (2026-10-12)
+
+**What changed**
+- `DATABASE_URL` in the local `.env` now points at the Supabase session pooler, with the local Docker URL kept as a commented line.
+- Migrations `0001`-`0003` applied to the Supabase project, followed by the full backfill and the clean job.
+- `.mcp.json` adds Supabase's MCP server at project scope; it is not authenticated yet.
+
+**Before the first migration**
+- The database held only Supabase's own schemas (`auth`, `storage`, `realtime`, `vault`); `public` had no tables. Postgres 17.11, timezone UTC, 10 MB.
+- Supabase ships an event trigger (`ensure_rls` / `rls_auto_enable`) that turns on row-level security for new `public` tables. The migrations also enable it explicitly.
+
+**Key numbers** (Supabase)
+- `raw_eia` 136,263 rows (13 MB), `raw_weather` 143,784 rows (29 MB), `clean_demand` 68,193 rows (5 MB). Database 57 MB of the 500 MB free tier. Counts match the local database.
+- Backfill took about 7 minutes. A trailing ingest and a second clean run afterwards changed 0 rows.
+- Every table has row-level security on and there are no policies. A REST request with the publishable key returns an empty list for all four tables.
+
+**Open issues**
+- `SUPABASE_SERVICE_ROLE_KEY` is still empty in `.env`; it is first needed for model storage in M4.
+- GitHub secrets are not set (the GitHub CLI is not logged in), so no scheduled workflow exists yet and the hosted data will go stale until one does.
+- Jobs run from this machine now write to Supabase. Tests still use the local Docker database.
+
+## M3: Baselines and backtest harness (2026-10-12)
+
+**What changed**
+- `gridcast.protocol`: issue time, demand cutoff, target periods (23, 24 or 25 per day) and same-local-hour shifting across daylight-saving transitions.
+- `gridcast.features.build.build_inputs`: the one place where data is cut off at issue time. It screens demand using only hours up to the cutoff, so flags and filled-in values cannot depend on later data. Backtests use it now and the live job will use the same function.
+- `gridcast.models.baselines.SeasonalNaive`: demand at the same local hour seven days earlier.
+- `gridcast.backtest.rolling.run_backtest`: monthly origins, a `fit` call per forecaster at each origin, then one forecast per day through `build_inputs`.
+- `gridcast.scoring`: MAPE, MAE, RMSE, daily peak error and timing, and win rate. Flagged hours are never scored, and an hour missing from any forecast is skipped for all of them.
+- `gridcast.jobs.backtest` prints the tables below.
+- 114 tests (51 new). The leakage tests tamper with or remove everything after the cutoff and assert that inputs and forecasts do not change.
+
+**Backtest: 2025-10 to 2026-09** (8,760 target hours; 8,710 scored, 48 skipped because the operator forecast is missing, 2 because the actual is flagged)
+
+| | MAPE | MAE (MW) | RMSE (MW) | Peak error (MW, mean abs) | Peak timing (h, mean abs) | Days beating operator |
+|---|---|---|---|---|---|---|
+| Seasonal naive | 6.68% | 1,873 | 2,802 | 2,472 | 2.9 | 76.0% |
+| Operator forecast | 8.97% | 2,454 | 3,734 | 879 | 3.1 | |
+
+| MAPE | Seasonal naive | Operator forecast |
+|---|---|---|
+| 09:00-17:00 local | 8.41% | 19.82% |
+| Other hours | 5.82% | 3.55% |
+| Winter | 4.68% | 7.91% |
+| Spring | 6.38% | 10.56% |
+| Summer | 7.26% | 8.80% |
+| Fall | 8.41% | 8.61% |
+
+Seasonal naive by month, 2025-10 to 2026-09: 5.23, 4.10, 4.82, 3.84, 5.44, 7.31, 5.55, 6.28, 8.80, 6.49, 6.53, 15.84. Operator: 9.25, 8.41, 6.83, 8.26, 8.71, 9.60, 11.01, 11.05, 10.07, 8.17, 8.21, 8.13.
+
+**What the table means**
+- A copy of last week does not really beat the operator. The all-hours result is produced by the midday mismatch found in M2: outside 09:00-17:00 the operator is at 3.55% and seasonal naive at 5.82%.
+- Checked against CAISO's own OASIS data for 2026-09-01 to 09-14 (336 hours): EIA `DF` equals CAISO's "Demand Forecast Day Ahead" exactly, and EIA `D` is within 0.19% of CAISO's "Total Actual Hourly Integrated Load". CAISO's two series differ from each other by 17.0% at midday and 4.1% otherwise. So the mismatch is in CAISO's own publications, not introduced by EIA, and switching the source to OASIS would not remove it.
+- The operator's peak-magnitude error (879 MW) is much better than seasonal naive's (2,472 MW), which is the more believable comparison.
+
+**Open issues**
+- Still undecided: how to report the head-to-head. The evaluation rules are unchanged; the tables report all hours and the time-of-day split side by side.
+- Backtests use the latest revised demand, since no revision history is kept. Live forecasts will see preliminary values, so the backtest has a small advantage the live record will not.
+- Backtest results are printed, not stored. The dashboard's backtest page will need them in the database.
+
+## M3.5: Minimal live loop (2026-10-12)
+
+**What changed**
+- `sql/migrations/0004_forecasts_and_scores.sql`: `forecasts` and `scores`, both with row-level security.
+  - A trigger stamps `issued_at` from the database clock, so a client cannot backdate a forecast, and rejects a forecast for any hour that has already started.
+  - Triggers reject UPDATE, DELETE and TRUNCATE on `forecasts`.
+  - `unique (model_version, target_time_utc)`: the first forecast recorded for an hour stands. This is stricter than the brief's `(model_version, issued_at, target_time_utc)`, which would have let a re-run add a second forecast for the same hour.
+- `gridcast.jobs.issue`: forecasts tomorrow (Pacific) through `build_inputs` and records it; refuses to record a partial forecast; `--dry-run` forecasts without recording.
+- `gridcast.jobs.score`: scores each forecast day 72 hours after it ends and never again. The model and the operator are scored on the same hours; each row also keeps the MAPE for hours outside 09:00-17:00 local.
+- Workflows: `ingest.yml` (every 3 hours: ingest, then clean), `issue.yml` (16:23 UTC: ingest, then issue), `score.yml` (17:41 UTC).
+- The live model is `seasonal_naive-v1`.
+- 128 tests (14 new), covering immutability, the database-stamped issue time, and both jobs' idempotency.
+
+**Key numbers**
+- First live forecast: 24 hours for 2026-10-13 Pacific, issued 2026-10-12 10:06:53 UTC (03:06 PDT) from a local run against Supabase. Range 27,698 to 45,505 MW.
+- A second run the same day inserted 0 rows.
+- On Supabase, UPDATE, DELETE and TRUNCATE on `forecasts` were each rejected by the trigger, and the publishable key reads nothing from `forecasts` or `scores`.
+- The first day can be scored from 2026-10-17 07:00 UTC.
+
+**Open issues**
+- The workflows are not on GitHub yet. Until they are committed and pushed, nothing issues tomorrow's forecast automatically.
+- A day on which the operator publishes no forecast is recorded with `hours_scored = 0`, so the model gets no score for it either.
+- No alerting beyond GitHub's failure email (M6). If the issue workflow fails, that day is missing from the record.
+- GitHub disables scheduled workflows in a public repo after 60 days without repository activity.
+- The first forecast was issued about six hours earlier in the day than the scheduled run will be. It used the same demand cutoff (end of the previous local day), so the inputs are the same as a 09:23 run would have had.

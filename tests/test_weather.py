@@ -26,9 +26,9 @@ def make_client(
 def test_parses_recorded_response(open_meteo_previous_runs: dict[str, Any]) -> None:
     rows = fetch_previous_runs(make_client(open_meteo_previous_runs), OAKLAND, START, END)
 
-    hours = 7 * 24
-    assert len(rows) == hours * len(config.WEATHER_VARIABLES)
-    assert {row.variable for row in rows} == set(config.WEATHER_VARIABLES)
+    assert len(rows) == 7 * 24
+    assert all(set(row.values) == set(config.WEATHER_VARIABLES) for row in rows)
+    assert all(value is not None for row in rows for value in row.values.values())
     assert {row.location for row in rows} == {"oakland"}
     assert {row.model for row in rows} == {config.WEATHER_MODEL}
     assert min(row.valid_time_utc for row in rows) == datetime(2026, 10, 1, 0, tzinfo=UTC)
@@ -75,6 +75,26 @@ def test_hours_without_a_value_are_omitted() -> None:
         variables=["temperature_2m"],
     )
 
-    assert [(row.valid_time_utc, row.value) for row in rows] == [
-        (datetime(2024, 1, 20, 12, tzinfo=UTC), 11.5)
+    assert [(row.valid_time_utc, row.values) for row in rows] == [
+        (datetime(2024, 1, 20, 12, tzinfo=UTC), {"temperature_2m": 11.5})
     ]
+
+
+def test_an_hour_with_some_variables_missing_is_kept() -> None:
+    payload = {
+        "hourly": {
+            "time": ["2024-01-20T12:00"],
+            "temperature_2m_previous_day2": [11.5],
+            "cloud_cover_previous_day2": [None],
+        }
+    }
+
+    (row,) = fetch_previous_runs(
+        make_client(payload),
+        OAKLAND,
+        date(2024, 1, 20),
+        date(2024, 1, 20),
+        variables=["temperature_2m", "cloud_cover"],
+    )
+
+    assert row.values == {"temperature_2m": 11.5, "cloud_cover": None}

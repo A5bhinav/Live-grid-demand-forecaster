@@ -59,6 +59,7 @@ ISSUE_HOUR_LOCAL = 9  # simulated issue time on day D
 # Demand is usable through the hour ending at this local hour on day D (0 = end of D-1).
 DEMAND_CUTOFF_HOUR_LOCAL = 0
 SCORING_DELAY_HOURS = 72  # wait for revisions to settle before scoring a target day
+FEATURE_LOOKBACK_DAYS = 90  # demand history screened and exposed to a forecast
 
 
 class Settings(BaseSettings):

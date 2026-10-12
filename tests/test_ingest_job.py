@@ -131,7 +131,7 @@ def test_ingest_eia_overwrites_revised_demand(conn: psycopg.Connection) -> None:
 def test_ingest_weather_twice_yields_the_same_rows(conn: psycopg.Connection) -> None:
     open_meteo = FakeOpenMeteo()
     start, end = date(2026, 9, 29), date(2026, 10, 2)  # two calendar months
-    expected = len(config.LOCATIONS) * 4 * 24 * len(config.WEATHER_VARIABLES)
+    expected = len(config.LOCATIONS) * 4 * 24  # one row per location and hour
 
     first = ingest_weather(conn, client_for(open_meteo), start, end, min_interval_s=0)
     second = ingest_weather(conn, client_for(open_meteo), start, end, min_interval_s=0)
@@ -156,7 +156,7 @@ def test_ingest_weather_overwrites_revised_forecasts(conn: psycopg.Connection) -
         conn, client_for(open_meteo), day, day, locations=oakland, min_interval_s=0
     )
 
-    rows = 24 * len(config.WEATHER_VARIABLES)
-    assert revised.changed == rows
-    assert count(conn, "raw_weather") == rows
-    assert conn.execute("select distinct value from raw_weather").fetchall() == [(25,)]
+    assert revised.changed == 24
+    assert count(conn, "raw_weather") == 24
+    values = conn.execute("select distinct temperature_2m, precipitation from raw_weather")
+    assert values.fetchall() == [(25, 25)]

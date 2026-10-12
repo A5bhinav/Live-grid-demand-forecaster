@@ -1,0 +1,29 @@
+name: issue
+
+on:
+  schedule:
+    - cron: "23 16 * * *" # 09:23 PDT / 08:23 PST, before 10:00 Pacific all year
+  workflow_dispatch:
+
+concurrency:
+  group: issue
+  cancel-in-progress: false
+
+jobs:
+  issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+      # Refresh inputs first. If the source is down, forecast from what the last
+      # scheduled ingest loaded rather than miss the day.
+      - run: uv run --no-sync python -m gridcast.jobs.ingest
+        continue-on-error: true
+      - run: uv run --no-sync python -m gridcast.jobs.issue

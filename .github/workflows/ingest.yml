@@ -1,0 +1,27 @@
+name: ingest
+
+on:
+  schedule:
+    - cron: "17 */3 * * *" # every 3 hours; off the hour, where scheduled runs are delayed most
+  workflow_dispatch:
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --locked --no-dev
+      # Re-pulls the trailing 7 days, so revisions overwrite earlier values.
+      - run: uv run --no-sync python -m gridcast.jobs.ingest
+      - run: uv run --no-sync python -m gridcast.jobs.clean
